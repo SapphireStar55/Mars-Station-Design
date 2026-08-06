@@ -1,0 +1,573 @@
+clc; clear; close all;
+
+%% Mars Constants
+mu_mars = 4.2828e13;          % Mars gravitational parameter (m^3/s^2)
+R_mars  = 3389.5e3;           % Mars mean radius (m)
+
+%% Moon Orbital Parameters (from Mars center)
+r_phobos  = 9376e3;           % Phobos orbital radius (m)
+r_deimos  = 23463e3;          % Deimos orbital radius (m)
+
+% Actual orbital inclinations relative to Mars equator
+inc_phobos = 1.08 * pi/180;   % ~1.08 degrees
+inc_deimos = 1.79 * pi/180;   % ~1.79 degrees
+
+fprintf('========================================\n');
+fprintf('MARS MISSION ORBIT ARCHITECTURE STUDY\n');
+fprintf('========================================\n\n');
+
+%% ORBIT TYPE 1: HIGHLY ELLIPTICAL POLAR ORBIT
+% Periapsis near Mars surface, apoapsis beyond Deimos
+fprintf('Calculating Orbit Type 1: Highly Elliptical Polar...\n');
+
+% Elliptical orbit parameters
+r_periapsis_1 = R_mars + 300e3;      % 300 km altitude at periapsis
+r_apoapsis_1 = r_deimos * 1.3;       % 30% beyond Deimos at apoapsis
+a_ellip_1 = (r_periapsis_1 + r_apoapsis_1) / 2;  % Semi-major axis
+e_ellip_1 = (r_apoapsis_1 - r_periapsis_1) / (r_apoapsis_1 + r_periapsis_1);  % Eccentricity
+inc_ellip_1 = 90 * pi/180;            % Polar orbit
+
+% Orbital period
+T_ellip_1 = 2*pi*sqrt(a_ellip_1^3/mu_mars);
+
+% Calculate velocities at key points
+v_peri_1 = sqrt(mu_mars*(2/r_periapsis_1 - 1/a_ellip_1));
+v_apo_1 = sqrt(mu_mars*(2/r_apoapsis_1 - 1/a_ellip_1));
+
+% Transfer ΔV calculations
+% From parking orbit to elliptical orbit
+r_park = R_mars + 400e3;  % 400 km parking orbit
+v_park = sqrt(mu_mars/r_park);
+dV_insert_1 = abs(v_peri_1 - v_park);  % Insertion burn
+
+% Access to Phobos
+r_at_phobos = a_ellip_1*(1-e_ellip_1^2)/(1+e_ellip_1*cos(acos((a_ellip_1*(1-e_ellip_1^2)-r_phobos)/(e_ellip_1*r_phobos))));
+v_at_phobos_ellip = sqrt(mu_mars*(2/r_phobos - 1/a_ellip_1));
+v_phobos_circ = sqrt(mu_mars/r_phobos);
+dV_phobos_1 = abs(v_phobos_circ - v_at_phobos_ellip) + 2*v_phobos_circ*sin(inc_ellip_1/2);
+
+% Access to Deimos
+v_at_deimos_ellip = v_apo_1;  % At apoapsis near Deimos
+v_deimos_circ = sqrt(mu_mars/r_deimos);
+dV_deimos_1 = abs(v_deimos_circ - v_at_deimos_ellip) + 2*v_deimos_circ*sin(inc_ellip_1/2);
+
+% Total mission ΔV
+total_dV_1 = dV_insert_1 + dV_phobos_1 + dV_deimos_1;
+
+% Proximity metrics (minimum distances during orbit)
+min_dist_mars_1 = r_periapsis_1 - R_mars;
+min_dist_phobos_1 = abs(r_phobos - r_periapsis_1);  % Approximate
+min_dist_deimos_1 = abs(r_apoapsis_1 - r_deimos);
+
+%% ORBIT TYPE 2: COPLANAR CIRCULAR ORBIT
+fprintf('Calculating Orbit Type 2: Coplanar Circular...\n');
+
+% Optimal radius between Phobos and Deimos
+r_circular_2 = sqrt(r_phobos * r_deimos);  % Geometric mean
+inc_circular_2 = (inc_phobos + inc_deimos)/2;  % Average inclination
+
+% Orbital period
+T_circular_2 = 2*pi*sqrt(r_circular_2^3/mu_mars);
+
+% Circular velocity
+v_circ_2 = sqrt(mu_mars/r_circular_2);
+
+% Transfer from parking orbit
+a_trans_to_circ = (r_park + r_circular_2)/2;
+v_park_depart = sqrt(mu_mars*(2/r_park - 1/a_trans_to_circ));
+v_circ_arrive = sqrt(mu_mars*(2/r_circular_2 - 1/a_trans_to_circ));
+dV_insert_2 = abs(v_park_depart - v_park) + abs(v_circ_2 - v_circ_arrive);
+
+% Access to Phobos (transfer down)
+a_to_phobos = (r_circular_2 + r_phobos)/2;
+v_phobos_depart = sqrt(mu_mars*(2/r_circular_2 - 1/a_to_phobos));
+v_phobos_arrive = sqrt(mu_mars*(2/r_phobos - 1/a_to_phobos));
+v_phobos_circ = sqrt(mu_mars/r_phobos);
+dV_phobos_2 = abs(v_phobos_depart - v_circ_2) + abs(v_phobos_circ - v_phobos_arrive);
+% Plane change
+dV_phobos_2 = dV_phobos_2 + 2*v_phobos_arrive*sin(abs(inc_circular_2-inc_phobos)/2);
+
+% Access to Deimos (transfer up)
+a_to_deimos = (r_circular_2 + r_deimos)/2;
+v_deimos_depart = sqrt(mu_mars*(2/r_circular_2 - 1/a_to_deimos));
+v_deimos_arrive = sqrt(mu_mars*(2/r_deimos - 1/a_to_deimos));
+v_deimos_circ = sqrt(mu_mars/r_deimos);
+dV_deimos_2 = abs(v_deimos_depart - v_circ_2) + abs(v_deimos_circ - v_deimos_arrive);
+% Plane change
+dV_deimos_2 = dV_deimos_2 + 2*v_deimos_arrive*sin(abs(inc_circular_2-inc_deimos)/2);
+
+% Total mission ΔV
+total_dV_2 = dV_insert_2 + dV_phobos_2 + dV_deimos_2;
+
+% Proximity metrics
+min_dist_mars_2 = r_circular_2 - R_mars;
+min_dist_phobos_2 = abs(r_circular_2 - r_phobos);
+min_dist_deimos_2 = abs(r_circular_2 - r_deimos);
+
+%% ORBIT TYPE 3: ELLIPTICAL BETWEEN PHOBOS AND DEIMOS
+fprintf('Calculating Orbit Type 3: Elliptical Between Moons...\n');
+
+% Periapsis just outside Phobos, apoapsis at Deimos
+r_periapsis_3 = r_phobos * 1.15;      % 15% outside Phobos orbit
+r_apoapsis_3 = r_deimos;
+a_ellip_3 = (r_periapsis_3 + r_apoapsis_3) / 2;
+e_ellip_3 = (r_apoapsis_3 - r_periapsis_3) / (r_apoapsis_3 + r_periapsis_3);
+inc_ellip_3 = (inc_phobos + inc_deimos)/2;  % Average inclination
+
+% Orbital period
+T_ellip_3 = 2*pi*sqrt(a_ellip_3^3/mu_mars);
+
+% Velocities
+v_peri_3 = sqrt(mu_mars*(2/r_periapsis_3 - 1/a_ellip_3));
+v_apo_3 = sqrt(mu_mars*(2/r_apoapsis_3 - 1/a_ellip_3));
+
+% Transfer from parking orbit
+a_trans_to_ellip = (r_park + r_periapsis_3)/2;
+v_park_depart_3 = sqrt(mu_mars*(2/r_park - 1/a_trans_to_ellip));
+v_peri_arrive = sqrt(mu_mars*(2/r_periapsis_3 - 1/a_trans_to_ellip));
+dV_insert_3 = abs(v_park_depart_3 - v_park) + abs(v_peri_3 - v_peri_arrive);
+
+% Access to Phobos (near periapsis)
+v_phobos_circ = sqrt(mu_mars/r_phobos);
+dV_phobos_3 = abs(v_phobos_circ - v_peri_3);
+% Plane change
+dV_phobos_3 = dV_phobos_3 + 2*v_peri_3*sin(abs(inc_ellip_3-inc_phobos)/2);
+
+% Access to Deimos (at apoapsis)
+v_deimos_circ = sqrt(mu_mars/r_deimos);
+dV_deimos_3 = abs(v_deimos_circ - v_apo_3);
+% Plane change
+dV_deimos_3 = dV_deimos_3 + 2*v_apo_3*sin(abs(inc_ellip_3-inc_deimos)/2);
+
+% Total mission ΔV
+total_dV_3 = dV_insert_3 + dV_phobos_3 + dV_deimos_3;
+
+% Proximity metrics
+min_dist_mars_3 = r_periapsis_3 - R_mars;
+min_dist_phobos_3 = r_periapsis_3 - r_phobos;  % Distance from periapsis to Phobos orbit
+min_dist_deimos_3 = 0;  % Passes through Deimos orbit
+
+%% COMPARISON TABLE
+fprintf('\n========================================\n');
+fprintf('ORBIT COMPARISON RESULTS\n');
+fprintf('========================================\n\n');
+
+fprintf('%-35s | %-15s | %-15s | %-15s\n', 'PARAMETER', 'Ellip. Polar', 'Coplanar Circ.', 'Ellip. Between');
+fprintf('%.100s\n', repmat('-', 1, 100));
+
+fprintf('%-35s | %12.2f km | %12.2f km | %12.2f km\n', 'Periapsis altitude', ...
+    (r_periapsis_1-R_mars)/1000, (r_circular_2-R_mars)/1000, (r_periapsis_3-R_mars)/1000);
+fprintf('%-35s | %12.2f km | %12.2f km | %12.2f km\n', 'Apoapsis altitude', ...
+    (r_apoapsis_1-R_mars)/1000, (r_circular_2-R_mars)/1000, (r_apoapsis_3-R_mars)/1000);
+fprintf('%-35s | %15.3f | %15.3f | %15.3f\n', 'Eccentricity', e_ellip_1, 0.0, e_ellip_3);
+fprintf('%-35s | %12.1f deg | %12.1f deg | %12.1f deg\n', 'Inclination', ...
+    inc_ellip_1*180/pi, inc_circular_2*180/pi, inc_ellip_3*180/pi);
+fprintf('%-35s | %12.2f hrs | %12.2f hrs | %12.2f hrs\n', 'Orbital Period (TOF)', ...
+    T_ellip_1/3600, T_circular_2/3600, T_ellip_3/3600);
+
+fprintf('\n%-35s\n', '--- DELTA-V BUDGET ---');
+fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'Insertion ΔV', ...
+    dV_insert_1, dV_insert_2, dV_insert_3);
+fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'Phobos Access ΔV', ...
+    dV_phobos_1, dV_phobos_2, dV_phobos_3);
+fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'Deimos Access ΔV', ...
+    dV_deimos_1, dV_deimos_2, dV_deimos_3);
+fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'TOTAL MISSION ΔV', ...
+    total_dV_1, total_dV_2, total_dV_3);
+
+fprintf('\n%-35s\n', '--- PROXIMITY METRICS ---');
+fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Mars Surface', ...
+    min_dist_mars_1/1000, min_dist_mars_2/1000, min_dist_mars_3/1000);
+fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Phobos', ...
+    min_dist_phobos_1/1000, min_dist_phobos_2/1000, min_dist_phobos_3/1000);
+fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Deimos', ...
+    min_dist_deimos_1/1000, min_dist_deimos_2/1000, min_dist_deimos_3/1000);
+
+fprintf('\n========================================\n');
+
+%% Store orbit data for visualization
+orbits = struct();
+
+% Orbit 1: Highly Elliptical Polar
+orbits(1).name = 'Highly Elliptical Polar';
+orbits(1).type = 'elliptical';
+orbits(1).a = a_ellip_1;
+orbits(1).e = e_ellip_1;
+orbits(1).inc = inc_ellip_1;
+orbits(1).RAAN = 45 * pi/180;
+orbits(1).omega = 0;  % Argument of periapsis
+orbits(1).T = T_ellip_1;
+orbits(1).color = [0.4 0.8 1];
+
+% Orbit 2: Coplanar Circular
+orbits(2).name = 'Coplanar Circular';
+orbits(2).type = 'circular';
+orbits(2).r = r_circular_2;
+orbits(2).inc = inc_circular_2;
+orbits(2).RAAN = 0;
+orbits(2).T = T_circular_2;
+orbits(2).color = [1 0.8 0.2];
+
+% Orbit 3: Elliptical Between Moons
+orbits(3).name = 'Elliptical Between Moons (Outside Phobos)';
+orbits(3).type = 'elliptical';
+orbits(3).a = a_ellip_3;
+orbits(3).e = e_ellip_3;
+orbits(3).inc = inc_ellip_3;
+orbits(3).RAAN = 0;
+orbits(3).omega = 0;
+orbits(3).T = T_ellip_3;
+orbits(3).color = [0.8 0.4 1];
+
+%% Generate orbit paths
+n_points = 500;
+
+for i = 1:3
+    if strcmp(orbits(i).type, 'elliptical')
+        % True anomaly
+        nu = linspace(0, 2*pi, n_points);
+        
+        % Orbital radius
+        r_orbit = orbits(i).a * (1 - orbits(i).e^2) ./ (1 + orbits(i).e * cos(nu));
+        
+        % Position in orbital plane
+        x_plane = r_orbit .* cos(nu);
+        y_plane = r_orbit .* sin(nu);
+        z_plane = zeros(size(nu));
+        
+        % Rotation matrices
+        R_omega = [cos(orbits(i).omega), -sin(orbits(i).omega), 0;
+                   sin(orbits(i).omega), cos(orbits(i).omega), 0;
+                   0, 0, 1];
+        
+        R_inc = [1, 0, 0;
+                 0, cos(orbits(i).inc), -sin(orbits(i).inc);
+                 0, sin(orbits(i).inc), cos(orbits(i).inc)];
+        
+        R_RAAN = [cos(orbits(i).RAAN), -sin(orbits(i).RAAN), 0;
+                  sin(orbits(i).RAAN), cos(orbits(i).RAAN), 0;
+                  0, 0, 1];
+        
+        R_total = R_RAAN * R_inc * R_omega;
+        
+        % Apply rotation
+        orbits(i).x = zeros(size(nu));
+        orbits(i).y = zeros(size(nu));
+        orbits(i).z = zeros(size(nu));
+        
+        for k = 1:length(nu)
+            pos_rotated = R_total * [x_plane(k); y_plane(k); z_plane(k)];
+            orbits(i).x(k) = pos_rotated(1);
+            orbits(i).y(k) = pos_rotated(2);
+            orbits(i).z(k) = pos_rotated(3);
+        end
+        
+    else  % Circular
+        theta = linspace(0, 2*pi, n_points);
+        
+        % Position in orbital plane
+        x_plane = orbits(i).r * cos(theta);
+        y_plane = orbits(i).r * sin(theta);
+        z_plane = zeros(size(theta));
+        
+        % Rotation matrices
+        R_inc = [1, 0, 0;
+                 0, cos(orbits(i).inc), -sin(orbits(i).inc);
+                 0, sin(orbits(i).inc), cos(orbits(i).inc)];
+        
+        R_RAAN = [cos(orbits(i).RAAN), -sin(orbits(i).RAAN), 0;
+                  sin(orbits(i).RAAN), cos(orbits(i).RAAN), 0;
+                  0, 0, 1];
+        
+        R_total = R_RAAN * R_inc;
+        
+        % Apply rotation
+        orbits(i).x = zeros(size(theta));
+        orbits(i).y = zeros(size(theta));
+        orbits(i).z = zeros(size(theta));
+        
+        for k = 1:length(theta)
+            pos_rotated = R_total * [x_plane(k); y_plane(k); z_plane(k)];
+            orbits(i).x(k) = pos_rotated(1);
+            orbits(i).y(k) = pos_rotated(2);
+            orbits(i).z(k) = pos_rotated(3);
+        end
+    end
+end
+
+%% 3D Visualization with all three orbits
+fig = figure('Position', [100, 100, 1600, 900]);
+
+% Add planet3D to path if available
+if exist('planet3D', 'file') && exist('background', 'file')
+    background('Milky Way');
+    hold on;
+    opts_mars.Position = [0; 0; 0];
+    planet3D('Mars', opts_mars);
+else
+    % Fallback: create Mars manually
+    [X_mars, Y_mars, Z_mars] = sphere(120);
+    X_mars = X_mars * R_mars;
+    Y_mars = Y_mars * R_mars;
+    Z_mars = Z_mars * R_mars;
+    
+    n_res = 121;
+    phi = linspace(0, pi, n_res);
+    theta_tex = linspace(0, 2*pi, n_res);
+    [PHI, THETA] = meshgrid(phi, theta_tex);
+    
+    large_scale = 0.3*sin(2*PHI).*cos(3*THETA) + 0.2*sin(3*PHI+1).*cos(2*THETA-0.5);
+    medium_scale = 0.15*sin(7*PHI).*cos(8*THETA) + 0.1*sin(5*PHI-0.8).*cos(6*THETA+1.2);
+    fine_scale = 0.05*randn(size(PHI));
+    terrain = large_scale + medium_scale + fine_scale;
+    
+    mars_red = 0.65 + 0.25*terrain + 0.05*abs(sin(4*PHI));
+    mars_green = 0.22 + 0.12*terrain + 0.03*abs(sin(3*THETA));
+    mars_blue = 0.08 + 0.06*terrain + 0.01*abs(cos(2*PHI));
+    
+    ice_cap = exp(-10*(PHI-0).^2) + exp(-10*(PHI-pi).^2);
+    mars_red = mars_red + 0.3*ice_cap;
+    mars_green = mars_green + 0.3*ice_cap;
+    mars_blue = mars_blue + 0.25*ice_cap;
+    
+    mars_texture = zeros(n_res, n_res, 3);
+    mars_texture(:,:,1) = mars_red';
+    mars_texture(:,:,2) = mars_green';
+    mars_texture(:,:,3) = mars_blue';
+    mars_texture = max(0, min(1, mars_texture));
+    
+    hold on;
+    surf(X_mars, Y_mars, Z_mars, 'CData', mars_texture, ...
+        'FaceColor', 'texturemap', 'EdgeColor', 'none', 'FaceAlpha', 1.0);
+end
+
+% Moon orbits
+theta_moon = linspace(0, 2*pi, 200);
+x_phobos = r_phobos * cos(theta_moon);
+y_phobos = r_phobos * sin(theta_moon) * cos(inc_phobos);
+z_phobos = r_phobos * sin(theta_moon) * sin(inc_phobos);
+
+x_deimos = r_deimos * cos(theta_moon);
+y_deimos = r_deimos * sin(theta_moon) * cos(inc_deimos);
+z_deimos = r_deimos * sin(theta_moon) * sin(inc_deimos);
+
+plot3(x_phobos, y_phobos, z_phobos, 'Color', [0.4 1 0.5], 'LineWidth', 2.5, ...
+    'DisplayName', 'Phobos Orbit');
+plot3(x_deimos, y_deimos, z_deimos, 'Color', [1 0.4 0.4], 'LineWidth', 2.5, ...
+    'DisplayName', 'Deimos Orbit');
+
+%% User selection for visualization and animation
+fprintf('\nWhich orbit would you like to visualize and animate?\n');
+fprintf('  1 - Highly Elliptical Polar (High ΔV, close to Mars & both moons)\n');
+fprintf('  2 - Coplanar Circular (Medium ΔV, equidistant between moons)\n');
+fprintf('  3 - Elliptical Between Moons (Low ΔV, outside Phobos to Deimos)\n');
+fprintf('  4 - Show all three simultaneously\n');
+fprintf('  0 - Skip visualization\n');
+
+orbit_choice = input('Enter choice (0-4): ');
+
+if orbit_choice == 0
+    fprintf('\nSkipping visualization.\n');
+    return;
+end
+
+% Determine which orbits to draw
+if orbit_choice >= 1 && orbit_choice <= 3
+    draw_orbits = orbit_choice;
+elseif orbit_choice == 4
+    draw_orbits = [1, 2, 3];
+else
+    fprintf('Invalid choice. Exiting.\n');
+    return;
+end
+
+% Plot selected spacecraft orbit(s)
+for i = draw_orbits
+    plot3(orbits(i).x, orbits(i).y, orbits(i).z, ...
+        'Color', orbits(i).color, 'LineWidth', 5, ...
+        'DisplayName', orbits(i).name);
+end
+
+% Add small equatorial reference
+theta_eq = linspace(0, 2*pi, 100);
+r_eq = R_mars * 2.5;
+plot3(r_eq*cos(theta_eq), r_eq*sin(theta_eq), zeros(size(theta_eq)), ...
+    'w--', 'LineWidth', 1, 'HandleVisibility', 'off');
+
+% Create moons
+moon_scale = 150;
+phobos_radius = 11.3e3 * moon_scale;
+deimos_radius = 6.2e3 * moon_scale;
+
+[X_p, Y_p, Z_p] = sphere(40);
+phobos_sphere = surf(X_p*phobos_radius + r_phobos, Y_p*phobos_radius, Z_p*phobos_radius, ...
+    'FaceColor', [0.55 0.6 0.5], 'EdgeColor', 'none');
+
+[X_d, Y_d, Z_d] = sphere(40);
+deimos_sphere = surf(X_d*deimos_radius + r_deimos, Y_d*deimos_radius, Z_d*deimos_radius, ...
+    'FaceColor', [0.48 0.5 0.45], 'EdgeColor', 'none');
+
+% Spacecraft markers for selected orbit(s)
+spacecraft_markers = cell(3, 1);
+trail_lines = cell(3, 1);
+for i = draw_orbits
+    spacecraft_markers{i} = plot3(orbits(i).x(1), orbits(i).y(1), orbits(i).z(1), ...
+        'o', 'MarkerSize', 20, 'MarkerFaceColor', orbits(i).color, ...
+        'MarkerEdgeColor', 'w', 'LineWidth', 2.5);
+    trail_lines{i} = plot3(orbits(i).x(1), orbits(i).y(1), orbits(i).z(1), ...
+        'Color', orbits(i).color, 'LineWidth', 3);
+end
+
+%% Formatting
+xlabel('X (m)', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'w');
+ylabel('Y (m)', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'w');
+zlabel('Z (m)', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'w');
+
+% Dynamic title based on selection
+if length(draw_orbits) == 1
+    title_str = sprintf('Mars Mission: %s', orbits(draw_orbits).name);
+else
+    title_str = 'Mars Mission: Three Orbit Architectures Comparison';
+end
+title(title_str, 'FontSize', 17, 'FontWeight', 'bold', 'Color', 'w');
+
+legend('Location', 'northeast', 'FontSize', 11, 'TextColor', 'w', ...
+    'Color', [0.05 0.05 0.05 0.8], 'EdgeColor', 'w');
+
+grid on;
+ax = gca;
+ax.GridColor = [1, 1, 1];
+ax.GridAlpha = 0.12;
+ax.XColor = 'w';
+ax.YColor = 'w';
+ax.ZColor = 'w';
+ax.Color = [0 0 0];
+fig.Color = [0 0 0];
+
+axis equal;
+view(40, 25);
+
+% Lighting
+light('Position', [1, -1, 0]);
+lighting gouraud;
+
+% Axis limits - adjusted based on selected orbit
+if orbit_choice == 1
+    max_radius = r_apoapsis_1 * 1.2;
+elseif orbit_choice == 2
+    max_radius = r_circular_2 * 1.3;
+elseif orbit_choice == 3
+    max_radius = r_deimos * 1.3;
+else
+    max_radius = r_apoapsis_1 * 1.2;
+end
+xlim([-max_radius, max_radius]);
+ylim([-max_radius, max_radius]);
+zlim([-max_radius, max_radius]);
+
+% Enable interactive orbit controls
+rotate3d on;
+fprintf('\n=== INTERACTIVE CONTROLS ===\n');
+fprintf('Use your mouse to rotate the view:\n');
+fprintf('  - Click and drag to rotate\n');
+fprintf('  - Right-click and drag to pan\n');
+fprintf('  - Scroll to zoom in/out\n');
+fprintf('Press any key when ready to continue...\n');
+pause;
+
+%% Animation
+fprintf('\nAnimate the selected orbit(s)? (1=Yes, 0=No): ');
+animate_choice = input('');
+
+if animate_choice ~= 1
+    fprintf('\nVisualization complete. Animation skipped.\n');
+    fprintf('You can continue to interact with the 3D view.\n');
+    return;
+end
+
+fprintf('\nEnable automatic camera rotation during animation?\n');
+fprintf('  1 - Yes (cinematic view)\n');
+fprintf('  0 - No (keep current view fixed)\n');
+rotate_camera = input('Enter choice: ');
+
+if rotate_camera ~= 1
+    fprintf('\nCamera rotation disabled. View will remain fixed during animation.\n');
+else
+    fprintf('\nAutomatic camera rotation enabled.\n');
+end
+
+n_frames = 1200;
+trail_length = 80;
+
+fprintf('\nAnimating selected orbit(s)...\n');
+fprintf('Press Ctrl+C to stop animation.\n\n');
+
+% Turn off rotate3d during animation for smooth rendering
+rotate3d off;
+
+% Animate the selected orbits
+animate_orbits = draw_orbits;
+
+for frame = 1:n_frames
+    % Update each selected orbit
+    for idx = animate_orbits
+        % Time for this orbit
+        t = (frame/n_frames) * orbits(idx).T * 3;
+        angle = 2*pi*t/orbits(idx).T;
+        
+        % Spacecraft position index
+        sc_idx = mod(round(angle/(2*pi) * n_points), n_points) + 1;
+        
+        % Update spacecraft
+        x_sc = orbits(idx).x(sc_idx);
+        y_sc = orbits(idx).y(sc_idx);
+        z_sc = orbits(idx).z(sc_idx);
+        set(spacecraft_markers{idx}, 'XData', x_sc, 'YData', y_sc, 'ZData', z_sc);
+        
+        % Update trail
+        trail_start = max(1, sc_idx - trail_length);
+        if sc_idx > trail_start
+            trail_indices = trail_start:sc_idx;
+        else
+            trail_indices = [trail_start:n_points, 1:sc_idx];
+        end
+        set(trail_lines{idx}, 'XData', orbits(idx).x(trail_indices), ...
+            'YData', orbits(idx).y(trail_indices), 'ZData', orbits(idx).z(trail_indices));
+    end
+    
+    % Update moons
+    T_phobos = 2*pi*sqrt(r_phobos^3/mu_mars);
+    T_deimos = 2*pi*sqrt(r_deimos^3/mu_mars);
+    
+    t_moon = (frame/n_frames) * T_phobos * 3;
+    angle_phobos = 2*pi*t_moon/T_phobos;
+    angle_deimos = 2*pi*t_moon/T_deimos;
+    
+    x_p = r_phobos * cos(angle_phobos);
+    y_p = r_phobos * sin(angle_phobos) * cos(inc_phobos);
+    z_p = r_phobos * sin(angle_phobos) * sin(inc_phobos);
+    set(phobos_sphere, 'XData', X_p*phobos_radius + x_p, ...
+        'YData', Y_p*phobos_radius + y_p, 'ZData', Z_p*phobos_radius + z_p);
+    
+    x_d = r_deimos * cos(angle_deimos);
+    y_d = r_deimos * sin(angle_deimos) * cos(inc_deimos);
+    z_d = r_deimos * sin(angle_deimos) * sin(inc_deimos);
+    set(deimos_sphere, 'XData', X_d*deimos_radius + x_d, ...
+        'YData', Y_d*deimos_radius + y_d, 'ZData', Z_d*deimos_radius + z_d);
+    
+    % Camera rotation (only if enabled)
+    if rotate_camera == 1
+        az = 40 + 110*sin(frame*0.0035);
+        el = 25 + 18*cos(frame*0.0028);
+        view(az, el);
+    end
+    
+    drawnow;
+    pause(0.01);
+end
+
+fprintf('Animation complete!\n');
+fprintf('\nRe-enabling interactive controls. You can now rotate the view.\n');
+rotate3d on;
+
+fprintf('\n=== END OF MISSION ANALYSIS ===\n');
