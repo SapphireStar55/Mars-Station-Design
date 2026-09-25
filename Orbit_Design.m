@@ -12,9 +12,8 @@ r_deimos  = 23463e3;          % Deimos orbital radius (m)
 inc_phobos = 1.08 * pi/180;   % ~1.08 degrees
 inc_deimos = 1.79 * pi/180;   % ~1.79 degrees
 
-fprintf('========================================\n');
+
 fprintf('MARS MISSION ORBIT ARCHITECTURE STUDY\n');
-fprintf('========================================\n\n');
 
 %% ORBIT TYPE 1: HIGHLY ELLIPTICAL POLAR ORBIT
 % Periapsis near Mars surface, apoapsis beyond Deimos
@@ -148,9 +147,7 @@ min_dist_phobos_3 = r_periapsis_3 - r_phobos;  % Distance from periapsis to Phob
 min_dist_deimos_3 = 0;  % Passes through Deimos orbit
 
 %% COMPARISON TABLE
-fprintf('\n========================================\n');
 fprintf('ORBIT COMPARISON RESULTS\n');
-fprintf('========================================\n\n');
 
 fprintf('%-35s | %-15s | %-15s | %-15s\n', 'PARAMETER', 'Ellip. Polar', 'Coplanar Circ.', 'Ellip. Between');
 fprintf('%.100s\n', repmat('-', 1, 100));
@@ -165,7 +162,7 @@ fprintf('%-35s | %12.1f deg | %12.1f deg | %12.1f deg\n', 'Inclination', ...
 fprintf('%-35s | %12.2f hrs | %12.2f hrs | %12.2f hrs\n', 'Orbital Period (TOF)', ...
     T_ellip_1/3600, T_circular_2/3600, T_ellip_3/3600);
 
-fprintf('\n%-35s\n', '--- DELTA-V BUDGET ---');
+fprintf('\n%-35s\n', 'DELTA-V BUDGET');
 fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'Insertion ΔV', ...
     dV_insert_1, dV_insert_2, dV_insert_3);
 fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'Phobos Access ΔV', ...
@@ -175,7 +172,7 @@ fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'Deimos Access ΔV', .
 fprintf('%-35s | %12.0f m/s | %12.0f m/s | %12.0f m/s\n', 'TOTAL MISSION ΔV', ...
     total_dV_1, total_dV_2, total_dV_3);
 
-fprintf('\n%-35s\n', '--- PROXIMITY METRICS ---');
+fprintf('\n%-35s\n', 'PROXIMITY METRICS');
 fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Mars Surface', ...
     min_dist_mars_1/1000, min_dist_mars_2/1000, min_dist_mars_3/1000);
 fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Phobos', ...
@@ -183,7 +180,6 @@ fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Phobos'
 fprintf('%-35s | %12.0f km | %12.0f km | %12.0f km\n', 'Min. Distance to Deimos', ...
     min_dist_deimos_1/1000, min_dist_deimos_2/1000, min_dist_deimos_3/1000);
 
-fprintf('\n========================================\n');
 
 %% Store orbit data for visualization
 orbits = struct();
@@ -467,7 +463,7 @@ zlim([-max_radius, max_radius]);
 
 % Enable interactive orbit controls
 rotate3d on;
-fprintf('\n=== INTERACTIVE CONTROLS ===\n');
+fprintf('\nINTERACTIVE CONTROLS\n');
 fprintf('Use your mouse to rotate the view:\n');
 fprintf('  - Click and drag to rotate\n');
 fprintf('  - Right-click and drag to pan\n');
@@ -570,4 +566,4 @@ fprintf('Animation complete!\n');
 fprintf('\nRe-enabling interactive controls. You can now rotate the view.\n');
 rotate3d on;
 
-fprintf('\n=== END OF MISSION ANALYSIS ===\n');
+fprintf('\nEND OF MISSION ANALYSIS\n');

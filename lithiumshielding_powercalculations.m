@@ -1,10 +1,13 @@
 %% FUSION_POWER_DESIGN.m
 %
 % 0-D (volume-averaged) power balance and sizing tool for a D-3He fusion
-% power source (Mars orbital base camp application). "0-D" means we
-% treat the plasma as a single well-mixed volume at temperature T and
-% density n -- no radial profiles, no MHD equilibrium, no confinement
-% scaling law. This is a first-pass systems sizing tool, not a physics
+% power source (Mars orbital base camp application). 
+% 
+% "0-D" means we treat the plasma as a single well-mixed volume at 
+% temperature T and density n. No radial profiles, no MHD equilibrium, 
+% no confinement scaling law. 
+% 
+% This is a first-pass systems sizing tool, not a physics
 % design code (that would require a transport code like TRANSP/ASTRA and
 % an equilibrium solver).
 %
@@ -29,11 +32,9 @@
 
 clear; clc; close all;
 
-%% =====================================================================
-%  USER INPUTS
-%  =====================================================================
+%% User Inputs
 
-% --- Plasma operating point ---
+% Plasma operating point
 T_keV   = 70;          % ion temperature, keV. D-3He power density peaks
                         % ~58 keV (NRL); Pfus/Pbrem ratio peaks ~100 keV.
                         % 70 keV is a compromise design point -- SWEEP
@@ -65,7 +66,7 @@ f_burn_T = 0.25;        % fraction of D-D-produced tritium that burns
                         % Higher burnup = more 14.1 MeV neutrons but also
                         % more fusion power.
 
-% --- Power target & conversion efficiencies ---
+% Power target & conversion efficiencies 
 P_e_target   = 200e3;   % target net electrical power output, W (200 kWe
                          % example for a Mars base camp -- change to match
                          % your actual load requirement)
@@ -77,18 +78,18 @@ eta_direct   = 0.65;    % direct energy conversion efficiency for charged
 eta_thermal  = 0.35;    % thermal-cycle efficiency (Brayton/Rankine) for
                          % neutron power captured as blanket heat
 
-% --- Geometry / shielding interface ---
+% Geometry / shielding interface
 standoff_m   = 10;      % distance from plasma core to crew/electronics
                          % location, meters (informs point-source dose
                          % scaling in the shielding script)
 
-%% =====================================================================
-%  REACTIVITY DATA (NRL Plasma Formulary, Maxwellian-averaged <sigma v>)
+%% REACTIVITY DATA 
+%  (NRL Plasma Formulary, Maxwellian-averaged <sigma v>)
 %  T in keV, <sigma v> in cm^3/s (verified against canonical peak values:
 %  D-T peaks ~8.7e-16 cm^3/s near 65 keV, D-3He peaks ~2.1-2.4e-16 cm^3/s
 %  near 100 keV -- both match the raw table values directly, confirming
 %  units are cm^3/s, NOT m^3/s -- do not add a further unit conversion).
-%  =====================================================================
+
 T_table = [1 2 5 10 20 50 100 200 500 1000];
 
 sv_DHe3_table = [1.0e-26 1.4e-23 6.7e-21 2.3e-19 3.8e-18 5.4e-17 1.6e-16 2.4e-16 2.3e-16 1.8e-16];
@@ -102,9 +103,9 @@ sv_DT   = interp_reactivity(T_keV, T_table, sv_DT_table);   % cm^3/s
 % reactivity ~= 2x the tabulated neutron-only channel.
 sv_DDp  = sv_DDn; % proton+T channel, same rate as neutron channel (50/50 split)
 
-%% =====================================================================
-%  DENSITIES AND REACTION RATE DENSITIES
-%  =====================================================================
+
+%%  DENSITIES AND REACTION RATE DENSITIES
+
 n_D   = f_D * n_i;
 n_He3 = (1-f_D) * n_i;
 n_e   = n_D*1 + n_He3*2;   % quasineutrality, Z_D=1, Z_He3=2
@@ -117,20 +118,20 @@ R_DT   = f_burn_T * R_DDp;                   % secondary D-T burn (uses
 
 MeV_to_J = 1.60218e-13;
 
-% --- Power densities (W/cm^3) ---
+% Power densities (W/cm^3)
 p_charged = (R_DHe3*18.3 + R_DDn*0.82 + R_DDp*4.03 + R_DT*3.5) * MeV_to_J;
 p_neutron = (R_DDn*2.45 + R_DT*14.1) * MeV_to_J;
 p_fus     = p_charged + p_neutron;
 
-% --- Bremsstrahlung loss density (NRL Formulary standard form) ---
+% Bremsstrahlung loss density (NRL Formulary standard form)
 % P_br [W/cm^3] = 1.69e-32 * sqrt(Te_keV) * n_e * sum(n_Z * Z^2)
 p_brem = 1.69e-32 * sqrt(T_keV) * n_e * (n_D*1 + n_He3*4);
 
-% --- Stored thermal energy density and conduction loss density ---
+% Stored thermal energy density and conduction loss density
 w_th   = 1.5 * (n_D + n_He3 + n_e) * T_keV * 1.60218e-16; % J/cm^3
 p_cond = w_th / tau_E;                                     % W/cm^3
 
-% --- Ignition check & recirculating power ---
+% Ignition check & recirculating power
 p_loss_plasma = p_brem + p_cond;
 if p_charged >= p_loss_plasma
     ignited = true;
@@ -142,7 +143,7 @@ else
     margin = p_charged / p_loss_plasma;
 end
 
-% --- Net electric power density and required volume ---
+% Net electric power density and required volume
 p_net_e = eta_direct*p_charged + eta_thermal*p_neutron - p_recirc; % W/cm^3
 
 fprintf('=== Plasma operating point ===\n');
@@ -170,9 +171,9 @@ fprintf('\n=== Sizing for %.0f kWe net output ===\n', P_e_target/1e3);
 fprintf('Required plasma volume: %.3e cm^3 (%.2f m^3)\n', V_cm3, V_cm3*1e-6);
 fprintf('Equivalent spherical plasma radius: %.2f cm (%.3f m)\n', R_plasma_cm, R_plasma_cm/100);
 
-%% =====================================================================
-%  SOURCE TERMS FOR SHIELDING (particles/s, at the two neutron energies)
-%  =====================================================================
+
+%%  SOURCE TERMS FOR SHIELDING (particles/s, at the two neutron energies)
+
 S_n_2p45 = R_DDn * V_cm3;   % n/s at 2.45 MeV
 S_n_14p1 = R_DT  * V_cm3;   % n/s at 14.1 MeV
 S_n_total = S_n_2p45 + S_n_14p1;
@@ -190,9 +191,8 @@ fprintf('  of which charged (direct-conv candidate): %.3f MW\n', P_charged_total
 fprintf('  of which neutron (blanket/thermal only):  %.3f MW\n', P_neutron_total_W/1e6);
 fprintf('Net electrical output:          %.1f kWe\n', P_e_target/1e3);
 
-%% =====================================================================
-%  SAVE SOURCE TERMS FOR THE SHIELDING SCRIPT
-%  =====================================================================
+%%  SAVE SOURCE TERMS FOR THE SHIELDING SCRIPT
+
 fusion_source.S_n_2p45_MeV = S_n_2p45;      % n/s
 fusion_source.S_n_14p1_MeV = S_n_14p1;      % n/s
 fusion_source.R_plasma_cm  = R_plasma_cm;
@@ -205,10 +205,9 @@ fusion_source.operating_point_note = sprintf(['T=%.1f keV, f_D=%.2f, n_i=%.2e cm
 save('fusion_source_terms.mat', 'fusion_source');
 fprintf('\nSource terms saved to fusion_source_terms.mat for shield_design_from_fusion.m\n');
 
-%% =====================================================================
-%  SENSITIVITY SWEEP: operating temperature vs. neutron source & volume
+%%  SENSITIVITY SWEEP: operating temperature vs. neutron source & volume
 %  (helps you see how sensitive the design is to the T_keV choice above)
-%  =====================================================================
+
 T_sweep = 20:5:150;
 S_n_sweep = zeros(size(T_sweep));
 V_sweep   = zeros(size(T_sweep));
@@ -261,9 +260,7 @@ sgtitle(sprintf('D-3He design sensitivity at %.0f kWe target, n_i=%.1e cm^{-3}, 
     P_e_target/1e3, n_i, tau_E));
 
 
-%% =====================================================================
-%  HELPER FUNCTIONS
-%  =====================================================================
+%%  HELPER FUNCTIONS
 
 function sv = interp_reactivity(T_query, T_table, sv_table)
     % Log-log interpolation of Maxwellian reactivity table. Reactivity
